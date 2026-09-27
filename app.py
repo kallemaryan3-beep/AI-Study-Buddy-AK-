@@ -1,7 +1,6 @@
 import streamlit as st
 import time
 import sqlite3
-
 from google import genai
 from pypdf import PdfReader
 
@@ -22,9 +21,7 @@ st.set_page_config(
 # ============================================================
 
 if not st.user.is_logged_in:
-
     st.title("📚 AI Study Buddy")
-
     st.write("Please sign in with Google to use AI Study Buddy.")
 
     st.button(
@@ -52,16 +49,17 @@ DATABASE = "visits.db"
 
 def setup_database():
     connection = sqlite3.connect(DATABASE)
-
     cursor = connection.cursor()
 
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS users (
             email TEXT PRIMARY KEY,
             name TEXT,
             visits INTEGER DEFAULT 0
         )
-    """)
+        """
+    )
 
     connection.commit()
     connection.close()
@@ -69,7 +67,6 @@ def setup_database():
 
 def record_visit(email, name):
     connection = sqlite3.connect(DATABASE)
-
     cursor = connection.cursor()
 
     cursor.execute(
@@ -80,7 +77,6 @@ def record_visit(email, name):
     user = cursor.fetchone()
 
     if user is None:
-
         cursor.execute(
             """
             INSERT INTO users (email, name, visits)
@@ -92,7 +88,6 @@ def record_visit(email, name):
         visits = 1
 
     else:
-
         visits = user[0] + 1
 
         cursor.execute(
@@ -112,7 +107,6 @@ def record_visit(email, name):
 
 def get_total_visits():
     connection = sqlite3.connect(DATABASE)
-
     cursor = connection.cursor()
 
     cursor.execute(
@@ -130,7 +124,7 @@ setup_database()
 
 
 # ============================================================
-# COUNT VISIT
+# RECORD VISIT
 # ============================================================
 
 if "visit_recorded" not in st.session_state:
@@ -190,15 +184,12 @@ st.sidebar.button(
 # ============================================================
 
 try:
-
     api_key = st.secrets["GEMINI_API_KEY"]
 
 except Exception:
-
     st.error(
         "GEMINI_API_KEY is missing from Streamlit Secrets."
     )
-
     st.stop()
 
 
@@ -219,7 +210,7 @@ st.write(
 
 
 # ============================================================
-# PDF EXTRACTION
+# PDF TEXT EXTRACTION
 # ============================================================
 
 def extract_pdf_text(pdf_file):
@@ -239,49 +230,45 @@ def extract_pdf_text(pdf_file):
 
 
 # ============================================================
-# GEMINI FUNCTION
+# GEMINI AI FUNCTION
 # ============================================================
 
 def ask_ai(prompt):
 
-    models = [
-        "gemini-3.8-flash",
-        "gemini-3.8-flash-lite"
-    ]
+    model = "gemini-3.8-flash"
 
-    for model in models:
+    for attempt in range(3):
 
-        for attempt in range(3):
+        try:
 
-            try:
+            response = client.models.generate_content(
+                model=model,
+                contents=prompt
+            )
 
-                response = client.models.generate_content(
-                    model=model,
-                    contents=prompt
-                )
+            if response.text:
+                return response.text
 
-                if response.text:
-                    return response.text
+            return "Gemini returned an empty response."
 
-            except Exception as error:
+        except Exception as error:
 
-                error_message = str(error)
+            error_message = str(error)
 
-                if (
-                    "503" in error_message
-                    or "UNAVAILABLE" in error_message
-                ):
+            if (
+                "503" in error_message
+                or "UNAVAILABLE" in error_message
+            ):
 
-                    if attempt < 2:
-                        time.sleep(2 ** attempt)
-                        continue
+                if attempt < 2:
+                    time.sleep(2 ** attempt)
+                    continue
 
-                break
+            st.error(
+                f"Gemini error: {error_message}"
+            )
 
-    st.error(
-        "Gemini is temporarily unavailable. "
-        "Please wait a moment and try again."
-    )
+            return None
 
     return None
 
@@ -333,7 +320,8 @@ if uploaded_file:
     if not notes.strip():
 
         st.error(
-            "I couldn't extract text from this PDF."
+            "I couldn't extract text from this PDF. "
+            "Try a text-based PDF."
         )
 
         st.stop()
@@ -410,7 +398,7 @@ Format them like this:
 **Question:** ...
 **Answer:** ...
 
-Focus on important concepts.
+Focus on important concepts rather than tiny details.
 
 Only use information supported by the study material.
 
@@ -453,9 +441,9 @@ Use a mixture of:
 - True/false
 - Short answer
 
-Do not give answers immediately after each question.
+Do not provide the answers immediately after each question.
 
-At the end, create:
+At the end, create a section called:
 
 ANSWER KEY
 
@@ -597,5 +585,3 @@ st.divider()
 st.caption(
     "📚 AI Study Buddy • Powered by Google Gemini"
 )
-    st.markdown("### 🤖 Study Buddy")
-    st.markdown(answer)
